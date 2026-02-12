@@ -6,6 +6,7 @@ import { AddMedicationForm, MedicationFormData } from "@/app/components/add-medi
 import { AuthScreen } from "@/app/components/auth-screen";
 import { useAuth } from "@/context/AuthContext";
 import { toast, Toaster } from "sonner";
+import { supabase } from "@/supabase";
 
 interface Medication {
   id: string;
@@ -21,19 +22,13 @@ interface Medication {
 }
 
 interface DoseHistory {
+  id?: string;
   medicationId: string;
   scheduledTime: string;
   takenAt: string;
   date: string;
   status?: 'taken' | 'missed';
 }
-
-interface UserData {
-  medications: Medication[];
-  doseHistory: DoseHistory[];
-}
-
-const STORAGE_PREFIX = 'meditrack_';
 
 export default function App() {
   const { user, loading, signOut, signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
@@ -47,7 +42,7 @@ export default function App() {
   // Load user data when user logs in
   useEffect(() => {
     if (user) {
-      loadUserData(user.id);
+      fetchUserData(user.id);
       setShowAuth(false);
     } else {
       setMedications([]);
@@ -64,25 +59,60 @@ export default function App() {
         hour: '2-digit',
         minute: '2-digit'
       });
-      setLastSyncTime(`Today at ${time}`);
+      setLastSyncTime(`Synced at ${time}`);
     }
   }, [medications, doseHistory, user]);
 
-  const loadUserData = (userId: string) => {
-    const savedData = localStorage.getItem(`${STORAGE_PREFIX}data_${userId}`);
-    if (savedData) {
-      const data: UserData = JSON.parse(savedData);
-      setMedications(data.medications || []);
-      setDoseHistory(data.doseHistory || []);
-    }
-  };
+  const fetchUserData = async (userId: string) => {
+    try {
+      // Fetch medications
+      const { data: medsData, error: medsError } = await supabase
+        .from('medications')
+        .select('*')
+        .eq('user_id', userId);
 
-  const saveUserData = (userId: string, meds: Medication[], history: DoseHistory[]) => {
-    const data: UserData = {
-      medications: meds,
-      doseHistory: history
-    };
-    localStorage.setItem(`${STORAGE_PREFIX}data_${userId}`, JSON.stringify(data));
+      if (medsError) throw medsError;
+
+      // Map DB snake_case to frontend camelCase
+      const formattedMeds: Medication[] = (medsData || []).map(m => ({
+        id: m.id,
+        name: m.name,
+        dosage: m.dosage,
+        unit: m.unit,
+        times: m.times,
+        startDate: m.start_date,
+        endDate: m.end_date,
+        instructions: m.instructions,
+        condition: m.condition,
+        prescribedBy: m.prescribed_by
+      }));
+
+      setMedications(formattedMeds);
+
+      // Fetch dose history
+      const { data: historyData, error: historyError } = await supabase
+        .from('dose_history')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (historyError) throw historyError;
+
+      // Map DB snake_case to frontend camelCase
+      const formattedHistory: DoseHistory[] = (historyData || []).map(h => ({
+        id: h.id,
+        medicationId: h.medication_id,
+        scheduledTime: h.scheduled_time,
+        takenAt: h.taken_at,
+        date: h.date,
+        status: h.status
+      }));
+
+      setDoseHistory(formattedHistory);
+
+    } catch (error: any) {
+      console.error('Error fetching data:', error);
+      toast.error('Failed to load your data');
+    }
   };
 
   const handleLogin = async (email: string, password: string) => {
@@ -116,32 +146,57 @@ export default function App() {
     toast.success('Logged out successfully');
   };
 
-  const handleSaveMedication = (formData: MedicationFormData) => {
+  const handleSaveMedication = async (formData: MedicationFormData) => {
     if (!user) {
       toast.error('Please sign in to add medications');
       return;
     }
 
-    const newMedication: Medication = {
-      id: Date.now().toString(),
-      name: formData.name,
-      dosage: formData.dosage,
-      unit: formData.unit,
-      times: formData.times,
-      startDate: formData.startDate,
-      endDate: formData.endDate,
-      instructions: formData.instructions,
-      condition: formData.condition,
-      prescribedBy: formData.prescribedBy
-    };
+    try {
+      const newMedication = {
+        user_id: user.id,
+        name: formData.name,
+        dosage: formData.dosage,
+        unit: formData.unit,
+        times: formData.times,
+        start_date: formData.startDate,
+        end_date: formData.endDate,
+        instructions: formData.instructions,
+        condition: formData.condition,
+        prescribed_by: formData.prescribedBy
+      };
 
-    const updatedMedications = [...medications, newMedication];
-    setMedications(updatedMedications);
-    saveUserData(user.id, updatedMedications, doseHistory);
-    toast.success(`${formData.name} added to your medications`);
+      const { data, error } = await supabase
+        .from('medications')
+        .insert([newMedication])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const formattedMed: Medication = {
+        id: data.id,
+        name: data.name,
+        dosage: data.dosage,
+        unit: data.unit,
+        times: data.times,
+        startDate: data.start_date,
+        endDate: data.end_date,
+        instructions: data.instructions,
+        condition: data.condition,
+        prescribedBy: data.prescribed_by
+      };
+
+      setMedications([...medications, formattedMed]);
+      toast.success(`${formData.name} added to your medications`);
+
+    } catch (error: any) {
+      console.error('Error saving medication:', error);
+      toast.error('Failed to save medication');
+    }
   };
 
-  const handleMarkTaken = (medicationId: string, scheduledTime: string) => {
+  const handleMarkTaken = async (medicationId: string, scheduledTime: string) => {
     if (!user) {
       toast.error('Please sign in to track doses');
       return;
@@ -150,23 +205,45 @@ export default function App() {
     const now = new Date();
     const todayDate = now.toISOString().split('T')[0];
 
-    const newDose: DoseHistory = {
-      medicationId,
-      scheduledTime,
-      takenAt: now.toISOString(),
-      date: todayDate,
-      status: 'taken'
-    };
+    try {
+      const newDose = {
+        user_id: user.id,
+        medication_id: medicationId,
+        scheduled_time: scheduledTime,
+        taken_at: now.toISOString(),
+        date: todayDate,
+        status: 'taken'
+      };
 
-    const updatedHistory = [...doseHistory, newDose];
-    setDoseHistory(updatedHistory);
-    saveUserData(user.id, medications, updatedHistory);
+      const { data, error } = await supabase
+        .from('dose_history')
+        .insert([newDose])
+        .select()
+        .single();
 
-    const medication = medications.find(m => m.id === medicationId);
-    toast.success(`${medication?.name} marked as taken`);
+      if (error) throw error;
+
+      const formattedDose: DoseHistory = {
+        id: data.id,
+        medicationId: data.medication_id,
+        scheduledTime: data.scheduled_time,
+        takenAt: data.taken_at,
+        date: data.date,
+        status: data.status
+      };
+
+      setDoseHistory([...doseHistory, formattedDose]);
+
+      const medication = medications.find(m => m.id === medicationId);
+      toast.success(`${medication?.name} marked as taken`);
+
+    } catch (error: any) {
+      console.error('Error recording dose:', error);
+      toast.error('Failed to record dose');
+    }
   };
 
-  const handleMarkMissed = (medicationId: string, scheduledTime: string) => {
+  const handleMarkMissed = async (medicationId: string, scheduledTime: string) => {
     if (!user) {
       toast.error('Please sign in to track doses');
       return;
@@ -175,20 +252,42 @@ export default function App() {
     const now = new Date();
     const todayDate = now.toISOString().split('T')[0];
 
-    const newDose: DoseHistory = {
-      medicationId,
-      scheduledTime,
-      takenAt: now.toISOString(),
-      date: todayDate,
-      status: 'missed'
-    };
+    try {
+      const newDose = {
+        user_id: user.id,
+        medication_id: medicationId,
+        scheduled_time: scheduledTime,
+        taken_at: now.toISOString(),
+        date: todayDate,
+        status: 'missed'
+      };
 
-    const updatedHistory = [...doseHistory, newDose];
-    setDoseHistory(updatedHistory);
-    saveUserData(user.id, medications, updatedHistory);
+      const { data, error } = await supabase
+        .from('dose_history')
+        .insert([newDose])
+        .select()
+        .single();
 
-    const medication = medications.find(m => m.id === medicationId);
-    toast.error(`${medication?.name} marked as missed`);
+      if (error) throw error;
+
+      const formattedDose: DoseHistory = {
+        id: data.id,
+        medicationId: data.medication_id,
+        scheduledTime: data.scheduled_time,
+        takenAt: data.taken_at,
+        date: data.date,
+        status: data.status
+      };
+
+      setDoseHistory([...doseHistory, formattedDose]);
+
+      const medication = medications.find(m => m.id === medicationId);
+      toast.error(`${medication?.name} marked as missed`);
+
+    } catch (error: any) {
+      console.error('Error recording missed dose:', error);
+      toast.error('Failed to record missed dose');
+    }
   };
 
   const handleSignInPrompt = () => {
@@ -281,3 +380,4 @@ export default function App() {
     </>
   );
 }
+
