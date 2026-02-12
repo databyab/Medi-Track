@@ -1,5 +1,5 @@
 import { Calendar, TrendingUp, Clock, AlertCircle, BarChart3 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart } from 'recharts';
 
 interface Medication {
   id: string;
@@ -19,6 +19,7 @@ interface DoseHistory {
   scheduledTime: string;
   takenAt: string;
   date: string;
+  status?: 'taken' | 'missed';
 }
 
 interface ReportsProps {
@@ -39,7 +40,7 @@ export function Reports({ medications, doseHistory, user, onSignIn }: ReportsPro
           </h1>
         </section>
 
-        <div 
+        <div
           className="rounded-[18px] p-12 text-center"
           style={{
             backgroundColor: 'rgba(255, 255, 255, 0.96)',
@@ -68,7 +69,7 @@ export function Reports({ medications, doseHistory, user, onSignIn }: ReportsPro
   // Calculate adherence metrics
   const totalDoses = medications.reduce((acc, med) => acc + med.times.length, 0);
   const activeMedications = medications.length;
-  
+
   // Calculate adherence rate from history
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const date = new Date();
@@ -78,7 +79,8 @@ export function Reports({ medications, doseHistory, user, onSignIn }: ReportsPro
 
   const adherenceData = last7Days.map(date => {
     const scheduled = totalDoses;
-    const taken = doseHistory.filter(h => h.date === date).length;
+    // Only count doses that were actually taken (not missed)
+    const taken = doseHistory.filter(h => h.date === date && h.status === 'taken').length;
     return {
       date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       adherence: scheduled > 0 ? Math.round((taken / scheduled) * 100) : 0,
@@ -87,11 +89,13 @@ export function Reports({ medications, doseHistory, user, onSignIn }: ReportsPro
     };
   });
 
-  const overallAdherence = doseHistory.length > 0 
-    ? Math.round((doseHistory.length / (totalDoses * 7)) * 100)
+  // Calculate overall adherence (only taken doses)
+  const takenDosesCount = doseHistory.filter(h => h.status === 'taken').length;
+  const overallAdherence = doseHistory.length > 0
+    ? Math.round((takenDosesCount / (totalDoses * 7)) * 100)
     : 0;
 
-  const currentStreak = calculateStreak(doseHistory, medications);
+  const currentStreak = calculateStreak(doseHistory);
 
   return (
     <div className="max-w-[1200px] mx-auto px-8 py-10">
@@ -133,7 +137,7 @@ export function Reports({ medications, doseHistory, user, onSignIn }: ReportsPro
       {doseHistory.length > 0 && (
         <section className="mb-10">
           <h2 className="mb-6">Adherence Timeline</h2>
-          <div 
+          <div
             className="rounded-[18px] p-8"
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.96)',
@@ -151,17 +155,17 @@ export function Reports({ medications, doseHistory, user, onSignIn }: ReportsPro
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={adherenceData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E6EAF0" />
-                <XAxis 
-                  dataKey="date" 
+                <XAxis
+                  dataKey="date"
                   tick={{ fontSize: 12, fill: '#475569' }}
                   stroke="#E6EAF0"
                 />
-                <YAxis 
+                <YAxis
                   tick={{ fontSize: 12, fill: '#475569' }}
                   stroke="#E6EAF0"
                   domain={[0, 100]}
                 />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{
                     backgroundColor: 'white',
                     border: '1px solid #E6EAF0',
@@ -173,10 +177,10 @@ export function Reports({ medications, doseHistory, user, onSignIn }: ReportsPro
                     return [value, name];
                   }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="adherence" 
-                  stroke="#0F766E" 
+                <Line
+                  type="monotone"
+                  dataKey="adherence"
+                  stroke="#0F766E"
                   strokeWidth={3}
                   dot={{ fill: '#0F766E', r: 4 }}
                   activeDot={{ r: 6 }}
@@ -190,7 +194,7 @@ export function Reports({ medications, doseHistory, user, onSignIn }: ReportsPro
       {/* Medication List */}
       <section className="mb-10">
         <h2 className="mb-6">All Medications</h2>
-        <div 
+        <div
           className="rounded-[18px] p-8"
           style={{
             backgroundColor: 'rgba(255, 255, 255, 0.96)',
@@ -221,21 +225,21 @@ export function Reports({ medications, doseHistory, user, onSignIn }: ReportsPro
   );
 }
 
-function StatCard({ 
-  title, 
-  value, 
-  subtitle, 
-  icon, 
-  color 
-}: { 
-  title: string; 
-  value: string; 
-  subtitle: string; 
+function StatCard({
+  title,
+  value,
+  subtitle,
+  icon,
+  color
+}: {
+  title: string;
+  value: string;
+  subtitle: string;
   icon: React.ReactNode;
   color: string;
 }) {
   return (
-    <div 
+    <div
       className="p-6 rounded-[16px]"
       style={{
         backgroundColor: 'white',
@@ -258,15 +262,15 @@ function StatCard({
 
 function MedicationCard({ medication }: { medication: Medication }) {
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
     });
   };
 
   return (
-    <div 
+    <div
       className="p-6 rounded-xl border"
       style={{ backgroundColor: '#F7FAF9', borderColor: '#E6EAF0' }}
     >
@@ -278,10 +282,10 @@ function MedicationCard({ medication }: { medication: Medication }) {
           </p>
         </div>
         {medication.condition && (
-          <span 
+          <span
             className="px-3 py-1 rounded-full"
-            style={{ 
-              backgroundColor: '#E6EAF0', 
+            style={{
+              backgroundColor: '#E6EAF0',
               color: '#0F172A',
               fontSize: '12px'
             }}
@@ -324,23 +328,44 @@ function MedicationCard({ medication }: { medication: Medication }) {
   );
 }
 
-function calculateStreak(doseHistory: DoseHistory[], medications: Medication[]): number {
+function calculateStreak(doseHistory: DoseHistory[]): number {
   const today = new Date();
   let streak = 0;
-  let lastDate = new Date();
 
-  // Sort dose history by date
-  doseHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // Only consider taken doses for streak
+  const takenDoses = doseHistory.filter(h => h.status === 'taken');
 
-  for (let i = doseHistory.length - 1; i >= 0; i--) {
-    const date = new Date(doseHistory[i].date);
-    if (date.toDateString() === lastDate.toDateString()) {
-      continue;
-    }
+  // Sort by date descending (newest first)
+  takenDoses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    if (date.toDateString() === new Date(today.getTime() - (streak + 1) * 24 * 60 * 60 * 1000).toDateString()) {
+  if (takenDoses.length === 0) return 0;
+
+  // Get unique dates where meds were taken
+  const takenDates = Array.from(new Set(takenDoses.map(d => d.date)));
+
+  // Check if today or yesterday was taken to start the streak
+  const todayStr = today.toISOString().split('T')[0];
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+  if (!takenDates.includes(todayStr) && !takenDates.includes(yesterdayStr)) {
+    return 0;
+  }
+
+  // Calculate streak logic: consecutive days backwards
+  let currentCheckDate = new Date(today);
+
+  // If not taken today, start checking from yesterday
+  if (!takenDates.includes(todayStr)) {
+    currentCheckDate.setDate(currentCheckDate.getDate() - 1);
+  }
+
+  while (true) {
+    const checkDateStr = currentCheckDate.toISOString().split('T')[0];
+    if (takenDates.includes(checkDateStr)) {
       streak++;
-      lastDate = date;
+      currentCheckDate.setDate(currentCheckDate.getDate() - 1);
     } else {
       break;
     }
