@@ -11,6 +11,8 @@ create table public.medications (
   instructions text,
   condition text,
   prescribed_by text,
+  current_stock integer default 0,
+  refill_threshold integer default 0,
   created_at timestamptz default now()
 );
 
@@ -44,6 +46,7 @@ create table public.dose_history (
   taken_at timestamptz not null,
   date date not null,
   status text check (status in ('taken', 'missed')),
+  notes text,
   created_at timestamptz default now()
 );
 

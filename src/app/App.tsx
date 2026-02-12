@@ -19,6 +19,8 @@ interface Medication {
   instructions?: string;
   condition?: string;
   prescribedBy?: string;
+  currentStock: number;
+  refillThreshold: number;
 }
 
 interface DoseHistory {
@@ -28,6 +30,7 @@ interface DoseHistory {
   takenAt: string;
   date: string;
   status?: 'taken' | 'missed';
+  notes?: string;
 }
 
 export default function App() {
@@ -84,7 +87,9 @@ export default function App() {
         endDate: m.end_date,
         instructions: m.instructions,
         condition: m.condition,
-        prescribedBy: m.prescribed_by
+        prescribedBy: m.prescribed_by,
+        currentStock: m.current_stock || 0,
+        refillThreshold: m.refill_threshold || 0
       }));
 
       setMedications(formattedMeds);
@@ -104,7 +109,8 @@ export default function App() {
         scheduledTime: h.scheduled_time,
         takenAt: h.taken_at,
         date: h.date,
-        status: h.status
+        status: h.status,
+        notes: h.notes
       }));
 
       setDoseHistory(formattedHistory);
@@ -163,7 +169,9 @@ export default function App() {
         end_date: formData.endDate,
         instructions: formData.instructions,
         condition: formData.condition,
-        prescribed_by: formData.prescribedBy
+        prescribed_by: formData.prescribedBy,
+        current_stock: formData.initialStock || 0,
+        refill_threshold: formData.refillThreshold || 0
       };
 
       const { data, error } = await supabase
@@ -184,7 +192,9 @@ export default function App() {
         endDate: data.end_date,
         instructions: data.instructions,
         condition: data.condition,
-        prescribedBy: data.prescribed_by
+        prescribedBy: data.prescribed_by,
+        currentStock: data.current_stock || 0,
+        refillThreshold: data.refill_threshold || 0
       };
 
       setMedications([...medications, formattedMed]);
@@ -196,7 +206,7 @@ export default function App() {
     }
   };
 
-  const handleMarkTaken = async (medicationId: string, scheduledTime: string) => {
+  const handleMarkTaken = async (medicationId: string, scheduledTime: string, notes?: string) => {
     if (!user) {
       toast.error('Please sign in to track doses');
       return;
@@ -204,37 +214,61 @@ export default function App() {
 
     const now = new Date();
     const todayDate = now.toISOString().split('T')[0];
+    const medication = medications.find(m => m.id === medicationId);
 
     try {
+      // 1. Record dose
       const newDose = {
         user_id: user.id,
         medication_id: medicationId,
         scheduled_time: scheduledTime,
         taken_at: now.toISOString(),
         date: todayDate,
-        status: 'taken'
+        status: 'taken',
+        notes: notes
       };
 
-      const { data, error } = await supabase
+      const { data: doseData, error: doseError } = await supabase
         .from('dose_history')
         .insert([newDose])
         .select()
         .single();
 
-      if (error) throw error;
+      if (doseError) throw doseError;
+
+      // 2. Decrement stock if applicable
+      if (medication && medication.currentStock > 0) {
+        const newStock = Math.max(0, medication.currentStock - 1);
+        const { error: stockError } = await supabase
+          .from('medications')
+          .update({ current_stock: newStock })
+          .eq('id', medicationId);
+
+        if (stockError) throw stockError;
+
+        // Update local medication stock
+        setMedications(prev => prev.map(m =>
+          m.id === medicationId ? { ...m, currentStock: newStock } : m
+        ));
+
+        if (newStock <= medication.refillThreshold && newStock > 0) {
+          toast.warning(`Low stock: Only ${newStock} ${medication.unit} left!`, { duration: 5000 });
+        } else if (newStock === 0) {
+          toast.error(`Out of stock! Time to refill ${medication.name}.`, { duration: 5000 });
+        }
+      }
 
       const formattedDose: DoseHistory = {
-        id: data.id,
-        medicationId: data.medication_id,
-        scheduledTime: data.scheduled_time,
-        takenAt: data.taken_at,
-        date: data.date,
-        status: data.status
+        id: doseData.id,
+        medicationId: doseData.medication_id,
+        scheduledTime: doseData.scheduled_time,
+        takenAt: doseData.taken_at,
+        date: doseData.date,
+        status: doseData.status,
+        notes: doseData.notes
       };
 
       setDoseHistory([...doseHistory, formattedDose]);
-
-      const medication = medications.find(m => m.id === medicationId);
       toast.success(`${medication?.name} marked as taken`);
 
     } catch (error: any) {
@@ -243,7 +277,7 @@ export default function App() {
     }
   };
 
-  const handleMarkMissed = async (medicationId: string, scheduledTime: string) => {
+  const handleMarkMissed = async (medicationId: string, scheduledTime: string, notes?: string) => {
     if (!user) {
       toast.error('Please sign in to track doses');
       return;
@@ -259,7 +293,8 @@ export default function App() {
         scheduled_time: scheduledTime,
         taken_at: now.toISOString(),
         date: todayDate,
-        status: 'missed'
+        status: 'missed',
+        notes: notes
       };
 
       const { data, error } = await supabase
@@ -276,7 +311,8 @@ export default function App() {
         scheduledTime: data.scheduled_time,
         takenAt: data.taken_at,
         date: data.date,
-        status: data.status
+        status: data.status,
+        notes: data.notes
       };
 
       setDoseHistory([...doseHistory, formattedDose]);
@@ -294,8 +330,13 @@ export default function App() {
     if (!user) return;
 
     const todayDate = new Date().toISOString().split('T')[0];
+    const medication = medications.find(m => m.id === medicationId);
+    const doseToDelete = doseHistory.find(h =>
+      h.medicationId === medicationId && h.scheduledTime === scheduledTime && h.date === todayDate
+    );
 
     try {
+      // 1. Delete record
       const { error } = await supabase
         .from('dose_history')
         .delete()
@@ -305,6 +346,19 @@ export default function App() {
         .eq('date', todayDate);
 
       if (error) throw error;
+
+      // 2. Increment stock back if it was taken
+      if (doseToDelete?.status === 'taken' && medication) {
+        const newStock = medication.currentStock + 1;
+        await supabase
+          .from('medications')
+          .update({ current_stock: newStock })
+          .eq('id', medicationId);
+
+        setMedications(prev => prev.map(m =>
+          m.id === medicationId ? { ...m, currentStock: newStock } : m
+        ));
+      }
 
       setDoseHistory(prev => prev.filter(h =>
         !(h.medicationId === medicationId && h.scheduledTime === scheduledTime && h.date === todayDate)
