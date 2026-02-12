@@ -30,10 +30,11 @@ interface DashboardProps {
   doseHistory: DoseHistory[];
   onMarkTaken: (medicationId: string, scheduledTime: string) => void;
   onMarkMissed: (medicationId: string, scheduledTime: string) => void;
+  onDeleteDose: (medicationId: string, scheduledTime: string) => void;
   lastSyncTime?: string;
 }
 
-export function Dashboard({ medications, onAddMedication, user, onSignIn, doseHistory, onMarkTaken, onMarkMissed, lastSyncTime }: DashboardProps) {
+export function Dashboard({ medications, onAddMedication, user, onSignIn, doseHistory, onMarkTaken, onMarkMissed, onDeleteDose, lastSyncTime }: DashboardProps) {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -181,17 +182,17 @@ export function Dashboard({ medications, onAddMedication, user, onSignIn, doseHi
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto px-8 py-10">
+    <div className="max-w-[1200px] mx-auto px-4 sm:px-8 py-10">
       {/* Hero Section */}
       <section className="mb-10">
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
           <div>
             <h1 className="mb-3" style={{ color: '#0F172A' }}>
               Track your medications, doses, and schedule.
             </h1>
           </div>
           {lastSyncTime && (
-            <div className="text-right">
+            <div className="sm:text-right">
               <p style={{ fontSize: '12px', color: '#4D7C6F', fontWeight: 600 }}>✓ Progress synced</p>
               <p style={{ fontSize: '12px', color: '#475569' }}>{lastSyncTime}</p>
             </div>
@@ -235,7 +236,7 @@ export function Dashboard({ medications, onAddMedication, user, onSignIn, doseHi
       {/* Today's Medications Panel */}
       <section className="mb-10">
         <div
-          className="rounded-[18px] p-8"
+          className="rounded-[18px] p-6 lg:p-8"
           style={{
             backgroundColor: 'rgba(255, 255, 255, 0.96)',
             backdropFilter: 'blur(10px)',
@@ -274,7 +275,7 @@ export function Dashboard({ medications, onAddMedication, user, onSignIn, doseHi
               {todaysMedications.map((med, idx) => (
                 <div
                   key={`${med.id}-${idx}`}
-                  className="flex items-center justify-between p-4 rounded-xl border"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border gap-4"
                   style={{
                     backgroundColor: med.isTaken ? '#F0F9F4' : med.isMissed ? '#FEF2F2' : '#F7FAF9',
                     borderColor: med.isTaken ? '#4D7C6F' : med.isMissed ? '#FCA5A5' : '#E6EAF0'
@@ -282,7 +283,7 @@ export function Dashboard({ medications, onAddMedication, user, onSignIn, doseHi
                 >
                   <div className="flex items-center gap-4">
                     <div
-                      className="w-12 h-12 rounded-lg flex items-center justify-center"
+                      className="w-12 h-12 rounded-lg flex flex-shrink-0 items-center justify-center"
                       style={{ backgroundColor: med.isTaken ? '#4D7C6F' : med.isMissed ? '#EF4444' : 'white' }}
                     >
                       {med.isTaken ? (
@@ -304,26 +305,31 @@ export function Dashboard({ medications, onAddMedication, user, onSignIn, doseHi
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => onMarkTaken(med.id, med.scheduledTime)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium"
+                        className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium"
                         style={{ backgroundColor: '#0F766E', color: 'white' }}
                       >
                         Taken
                       </button>
                       <button
                         onClick={() => onMarkMissed(med.id, med.scheduledTime)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium border"
+                        className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium border"
                         style={{ borderColor: '#FCA5A5', color: '#EF4444', backgroundColor: 'white' }}
                       >
                         Missed
                       </button>
                     </div>
-                  ) : med.isTaken ? (
-                    <div className="px-4 py-2" style={{ color: '#4D7C6F', fontSize: '14px', fontWeight: 600 }}>
-                      ✓ Completed
-                    </div>
                   ) : (
-                    <div className="px-4 py-2" style={{ color: '#EF4444', fontSize: '14px', fontWeight: 600 }}>
-                      ✕ Missed
+                    <div className="flex items-center justify-between sm:justify-end gap-3 px-1">
+                      <div style={{ color: med.isTaken ? '#4D7C6F' : '#EF4444', fontSize: '14px', fontWeight: 600 }}>
+                        {med.isTaken ? '✓ Completed' : '✕ Missed'}
+                      </div>
+                      <button
+                        onClick={() => onDeleteDose(med.id, med.scheduledTime)}
+                        className="text-xs px-2 py-1 rounded bg-white hover:bg-gray-100 border text-gray-500 font-medium"
+                        style={{ borderColor: '#E6EAF0' }}
+                      >
+                        Undo
+                      </button>
                     </div>
                   )}
                 </div>
