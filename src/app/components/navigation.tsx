@@ -23,7 +23,7 @@ export function Navigation({ onAddMedication, activeView, onViewChange, user, on
       <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex items-center gap-4 lg:gap-8">
           <Logo size="small" showText={true} />
-          
+
           {user && (
             <div className="hidden md:flex items-center gap-1">
               <button
@@ -49,7 +49,7 @@ export function Navigation({ onAddMedication, activeView, onViewChange, user, on
             </div>
           )}
         </div>
-        
+
         <div className="flex items-center gap-2 sm:gap-3">
           {user ? (
             <>
@@ -62,10 +62,10 @@ export function Navigation({ onAddMedication, activeView, onViewChange, user, on
                 <span className="hidden sm:inline">Add Medication</span>
                 <span className="sm:hidden">Add</span>
               </Button>
-              
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button 
+                  <button
                     className="w-10 h-10 rounded-full flex items-center justify-center border"
                     style={{ backgroundColor: '#F7FAF9', borderColor: '#E6EAF0' }}
                   >
@@ -85,14 +85,10 @@ export function Navigation({ onAddMedication, activeView, onViewChange, user, on
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
-          ) : (
-            <div className="px-3 sm:px-4 py-2 rounded-lg" style={{ backgroundColor: '#F7FAF9' }}>
-              <p style={{ fontSize: '12px', color: '#475569' }}>Preview Mode</p>
-            </div>
-          )}
+          ) : null}
         </div>
       </div>
-      
+
       {/* Mobile Bottom Tab Bar for Dashboard/Reports */}
       {user && (
         <div className="md:hidden border-t" style={{ borderColor: '#E6EAF0' }}>

@@ -72,7 +72,7 @@ export function AddMedicationForm({ onClose, onSave }: AddMedicationFormProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(15, 23, 42, 0.5)' }}>
-      <div 
+      <div
         className="w-full max-w-[640px] rounded-[18px] p-8 max-h-[90vh] overflow-y-auto"
         style={{
           backgroundColor: 'rgba(255, 255, 255, 0.96)',
@@ -83,7 +83,7 @@ export function AddMedicationForm({ onClose, onSave }: AddMedicationFormProps) {
       >
         <div className="flex items-center justify-between mb-6">
           <h2>Add Medication</h2>
-          <button 
+          <button
             onClick={onClose}
             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted transition-colors"
           >
@@ -99,7 +99,7 @@ export function AddMedicationForm({ onClose, onSave }: AddMedicationFormProps) {
               id="name"
               value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="e.g., Lisinopril"
+              placeholder="e.g., Antibiotics"
               required
               className="mt-2 h-11"
               style={{ backgroundColor: 'white' }}
@@ -115,7 +115,7 @@ export function AddMedicationForm({ onClose, onSave }: AddMedicationFormProps) {
                 type="number"
                 value={formData.dosage || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, dosage: parseFloat(e.target.value) }))}
-                placeholder="10"
+                placeholder="1"
                 required
                 className="mt-2 h-11"
                 style={{ backgroundColor: 'white' }}
@@ -241,7 +241,7 @@ export function AddMedicationForm({ onClose, onSave }: AddMedicationFormProps) {
                 id="condition"
                 value={formData.condition}
                 onChange={(e) => setFormData(prev => ({ ...prev, condition: e.target.value }))}
-                placeholder="e.g., Hypertension"
+                placeholder="e.g., Infection"
                 className="mt-2 h-11"
                 style={{ backgroundColor: 'white' }}
               />
@@ -252,7 +252,7 @@ export function AddMedicationForm({ onClose, onSave }: AddMedicationFormProps) {
                 id="prescribedBy"
                 value={formData.prescribedBy}
                 onChange={(e) => setFormData(prev => ({ ...prev, prescribedBy: e.target.value }))}
-                placeholder="e.g., Dr. Smith"
+                placeholder="e.g., Dr. Bhatt"
                 className="mt-2 h-11"
                 style={{ backgroundColor: 'white' }}
               />

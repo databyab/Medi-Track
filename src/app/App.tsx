@@ -4,12 +4,8 @@ import { Dashboard } from "@/app/components/dashboard";
 import { Reports } from "@/app/components/reports";
 import { AddMedicationForm, MedicationFormData } from "@/app/components/add-medication-form";
 import { AuthScreen } from "@/app/components/auth-screen";
+import { useAuth } from "@/context/AuthContext";
 import { toast, Toaster } from "sonner";
-
-interface User {
-  email: string;
-  id: string;
-}
 
 interface Medication {
   id: string;
@@ -29,6 +25,7 @@ interface DoseHistory {
   scheduledTime: string;
   takenAt: string;
   date: string;
+  status?: 'taken' | 'missed';
 }
 
 interface UserData {
@@ -39,30 +36,32 @@ interface UserData {
 const STORAGE_PREFIX = 'meditrack_';
 
 export default function App() {
+  const { user, loading, signOut, signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
   const [activeView, setActiveView] = useState<'dashboard' | 'reports'>('dashboard');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
   const [medications, setMedications] = useState<Medication[]>([]);
   const [doseHistory, setDoseHistory] = useState<DoseHistory[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
 
-  // Load user session on mount
+  // Load user data when user logs in
   useEffect(() => {
-    const savedUser = localStorage.getItem(`${STORAGE_PREFIX}user`);
-    if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      setUser(parsedUser);
-      loadUserData(parsedUser.id);
+    if (user) {
+      loadUserData(user.id);
+      setShowAuth(false);
+    } else {
+      setMedications([]);
+      setDoseHistory([]);
+      setLastSyncTime('');
     }
-  }, []);
+  }, [user]);
 
   // Update sync time whenever data changes
   useEffect(() => {
     if (user && (medications.length > 0 || doseHistory.length > 0)) {
       const now = new Date();
-      const time = now.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
+      const time = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
         minute: '2-digit'
       });
       setLastSyncTime(`Today at ${time}`);
@@ -86,56 +85,33 @@ export default function App() {
     localStorage.setItem(`${STORAGE_PREFIX}data_${userId}`, JSON.stringify(data));
   };
 
-  const handleLogin = (email: string, password: string) => {
-    // Simulate authentication - in real app this would call a backend
-    const users = JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}users`) || '{}');
-    
-    if (users[email] && users[email].password === password) {
-      const user: User = {
-        email,
-        id: users[email].id
-      };
-      setUser(user);
-      localStorage.setItem(`${STORAGE_PREFIX}user`, JSON.stringify(user));
-      loadUserData(user.id);
-      setShowAuth(false);
-      toast.success('Welcome back to MediTrack');
+  const handleLogin = async (email: string, password: string) => {
+    const { error } = await signInWithEmail(email, password);
+    if (error) {
+      toast.error(error);
     } else {
-      toast.error('Invalid email or password');
+      toast.success('Welcome back to MediTrack');
     }
   };
 
-  const handleSignUp = (email: string, password: string) => {
-    // Simulate user creation - in real app this would call a backend
-    const users = JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}users`) || '{}');
-    
-    if (users[email]) {
-      toast.error('An account with this email already exists');
-      return;
+  const handleSignUp = async (email: string, password: string) => {
+    const { error } = await signUpWithEmail(email, password);
+    if (error) {
+      toast.error(error);
+    } else {
+      toast.success('Account created successfully! Check your email to confirm.');
     }
-
-    const userId = Date.now().toString();
-    users[email] = {
-      id: userId,
-      password,
-      createdAt: new Date().toISOString()
-    };
-    
-    localStorage.setItem(`${STORAGE_PREFIX}users`, JSON.stringify(users));
-    
-    const user: User = { email, id: userId };
-    setUser(user);
-    localStorage.setItem(`${STORAGE_PREFIX}user`, JSON.stringify(user));
-    setShowAuth(false);
-    toast.success('Account created successfully');
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setMedications([]);
-    setDoseHistory([]);
-    setLastSyncTime('');
-    localStorage.removeItem(`${STORAGE_PREFIX}user`);
+  const handleGoogleSignIn = async () => {
+    const { error } = await signInWithGoogle();
+    if (error) {
+      toast.error(error);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
     setActiveView('dashboard');
     toast.success('Logged out successfully');
   };
@@ -173,34 +149,80 @@ export default function App() {
 
     const now = new Date();
     const todayDate = now.toISOString().split('T')[0];
-    
+
     const newDose: DoseHistory = {
       medicationId,
       scheduledTime,
       takenAt: now.toISOString(),
-      date: todayDate
+      date: todayDate,
+      status: 'taken'
     };
 
     const updatedHistory = [...doseHistory, newDose];
     setDoseHistory(updatedHistory);
     saveUserData(user.id, medications, updatedHistory);
-    
+
     const medication = medications.find(m => m.id === medicationId);
     toast.success(`${medication?.name} marked as taken`);
+  };
+
+  const handleMarkMissed = (medicationId: string, scheduledTime: string) => {
+    if (!user) {
+      toast.error('Please sign in to track doses');
+      return;
+    }
+
+    const now = new Date();
+    const todayDate = now.toISOString().split('T')[0];
+
+    const newDose: DoseHistory = {
+      medicationId,
+      scheduledTime,
+      takenAt: now.toISOString(),
+      date: todayDate,
+      status: 'missed'
+    };
+
+    const updatedHistory = [...doseHistory, newDose];
+    setDoseHistory(updatedHistory);
+    saveUserData(user.id, medications, updatedHistory);
+
+    const medication = medications.find(m => m.id === medicationId);
+    toast.error(`${medication?.name} marked as missed`);
   };
 
   const handleSignInPrompt = () => {
     setShowAuth(true);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F7FAF9' }}>
+        <div className="text-center">
+          <div
+            className="w-10 h-10 mx-auto mb-4 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: '#0F766E', borderTopColor: 'transparent' }}
+          />
+          <p style={{ color: '#475569', fontSize: '14px' }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const userForComponents = user ? { email: user.email ?? '' } : null;
+
   return (
     <>
       <div className="min-h-screen" style={{ backgroundColor: '#F7FAF9' }}>
-        {showAuth ? (
-          <AuthScreen onLogin={handleLogin} onSignUp={handleSignUp} />
+        {showAuth && !user ? (
+          <AuthScreen
+            onLogin={handleLogin}
+            onSignUp={handleSignUp}
+            onGoogleSignIn={handleGoogleSignIn}
+          />
         ) : (
           <>
-            <Navigation 
+            <Navigation
               onAddMedication={() => {
                 if (!user) {
                   setShowAuth(true);
@@ -211,25 +233,26 @@ export default function App() {
               }}
               activeView={activeView}
               onViewChange={setActiveView}
-              user={user}
+              user={userForComponents}
               onLogout={handleLogout}
             />
-            
+
             {activeView === 'dashboard' ? (
-              <Dashboard 
+              <Dashboard
                 medications={medications}
                 onAddMedication={() => user ? setShowAddForm(true) : setShowAuth(true)}
-                user={user}
+                user={userForComponents}
                 onSignIn={handleSignInPrompt}
                 doseHistory={doseHistory}
                 onMarkTaken={handleMarkTaken}
+                onMarkMissed={handleMarkMissed}
                 lastSyncTime={lastSyncTime}
               />
             ) : (
-              <Reports 
+              <Reports
                 medications={medications}
                 doseHistory={doseHistory}
-                user={user}
+                user={userForComponents}
                 onSignIn={handleSignInPrompt}
               />
             )}
@@ -243,8 +266,8 @@ export default function App() {
           </>
         )}
       </div>
-      <Toaster 
-        position="top-right" 
+      <Toaster
+        position="top-right"
         toastOptions={{
           style: {
             background: 'white',

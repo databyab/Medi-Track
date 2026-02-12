@@ -1,11 +1,22 @@
+# MediTrack
 
-  # MediTrack web application design
+Smart medication tracking web application. Track medications, doses, and schedules with Google authentication.
 
-  This is a code bundle for MediTrack web application design. The original project is available at https://www.figma.com/design/wMCgkvt2Ano4zHrR7XAV0W/MediTrack-web-application-design.
+## Tech Stack
 
-  ## Running the code
+- React + TypeScript + Vite
+- Tailwind CSS
+- Supabase (Authentication)
 
-  Run `npm i` to install the dependencies.
+## Getting Started
 
-  Run `npm run dev` to start the development server.
-  
+1. Run `npm install` to install dependencies
+2. Copy `.env.example` to `.env` and add your Supabase credentials
+3. Run `npm run dev` to start the development server
+
+## Environment Variables
+
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
