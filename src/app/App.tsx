@@ -290,32 +290,7 @@ export default function App() {
     }
   };
 
-  const handleDeleteDose = async (medicationId: string, scheduledTime: string) => {
-    if (!user) return;
 
-    const todayDate = new Date().toISOString().split('T')[0];
-
-    try {
-      const { error } = await supabase
-        .from('dose_history')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('medication_id', medicationId)
-        .eq('scheduled_time', scheduledTime)
-        .eq('date', todayDate);
-
-      if (error) throw error;
-
-      setDoseHistory(prev => prev.filter(h =>
-        !(h.medicationId === medicationId && h.scheduledTime === scheduledTime && h.date === todayDate)
-      ));
-
-      toast.success('Action undone');
-    } catch (error: any) {
-      console.error('Error deleting dose history:', error);
-      toast.error('Failed to undo action');
-    }
-  };
 
   const handleSignInPrompt = () => {
     setShowAuth(true);
@@ -372,7 +347,6 @@ export default function App() {
                 doseHistory={doseHistory}
                 onMarkTaken={handleMarkTaken}
                 onMarkMissed={handleMarkMissed}
-                onDeleteDose={handleDeleteDose}
                 lastSyncTime={lastSyncTime}
               />
             ) : (
