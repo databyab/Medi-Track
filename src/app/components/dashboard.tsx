@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Clock, Pill, TrendingUp, Calendar, CheckCircle2, Heart, Activity, Shield, ArrowRight, Lock, XCircle } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 
@@ -13,8 +12,6 @@ interface Medication {
   instructions?: string;
   condition?: string;
   prescribedBy?: string;
-  currentStock: number;
-  refillThreshold: number;
 }
 
 interface DoseHistory {
@@ -23,7 +20,6 @@ interface DoseHistory {
   takenAt: string;
   date: string;
   status?: 'taken' | 'missed';
-  notes?: string;
 }
 
 interface DashboardProps {
@@ -32,15 +28,13 @@ interface DashboardProps {
   user: { email: string } | null;
   onSignIn: () => void;
   doseHistory: DoseHistory[];
-  onMarkTaken: (medicationId: string, scheduledTime: string, notes?: string) => void;
-  onMarkMissed: (medicationId: string, scheduledTime: string, notes?: string) => void;
+  onMarkTaken: (medicationId: string, scheduledTime: string) => void;
+  onMarkMissed: (medicationId: string, scheduledTime: string) => void;
   onDeleteDose: (medicationId: string, scheduledTime: string) => void;
   lastSyncTime?: string;
 }
 
 export function Dashboard({ medications, onAddMedication, user, onSignIn, doseHistory, onMarkTaken, onMarkMissed, onDeleteDose, lastSyncTime }: DashboardProps) {
-  const [doseNotes, setDoseNotes] = useState<Record<string, string>>({});
-
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -55,7 +49,6 @@ export function Dashboard({ medications, onAddMedication, user, onSignIn, doseHi
     med.times.map(time => ({
       ...med,
       scheduledTime: time,
-      historyItem: doseHistory.find(h => h.medicationId === med.id && h.scheduledTime === time && h.date === todayDate),
       isTaken: doseHistory.some(
         h => h.medicationId === med.id && h.scheduledTime === time && h.date === todayDate && (h.status === 'taken' || !h.status)
       ),
@@ -64,10 +57,6 @@ export function Dashboard({ medications, onAddMedication, user, onSignIn, doseHi
       )
     }))
   ).sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime));
-
-  const handleNoteChange = (id: string, time: string, note: string) => {
-    setDoseNotes(prev => ({ ...prev, [`${id}-${time}`]: note }));
-  };
 
   // Calculate today's progress
   const totalDosesToday = todaysMedications.length;
@@ -286,101 +275,63 @@ export function Dashboard({ medications, onAddMedication, user, onSignIn, doseHi
               {todaysMedications.map((med, idx) => (
                 <div
                   key={`${med.id}-${idx}`}
-                  className="flex flex-col p-4 rounded-xl border gap-4"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border gap-4"
                   style={{
                     backgroundColor: med.isTaken ? '#F0F9F4' : med.isMissed ? '#FEF2F2' : '#F7FAF9',
                     borderColor: med.isTaken ? '#4D7C6F' : med.isMissed ? '#FCA5A5' : '#E6EAF0'
                   }}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="w-12 h-12 rounded-lg flex flex-shrink-0 items-center justify-center"
-                        style={{ backgroundColor: med.isTaken ? '#4D7C6F' : med.isMissed ? '#EF4444' : 'white' }}
-                      >
-                        {med.isTaken ? (
-                          <CheckCircle2 className="w-6 h-6" style={{ color: 'white' }} />
-                        ) : med.isMissed ? (
-                          <XCircle className="w-6 h-6" style={{ color: 'white' }} />
-                        ) : (
-                          <Pill className="w-6 h-6" style={{ color: '#0F766E' }} />
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="m-0">{med.name}</h3>
-                          {med.currentStock > 0 && (
-                            <span
-                              className="px-2 py-0.5 rounded-full text-[10px] font-bold"
-                              style={{
-                                backgroundColor: med.currentStock <= med.refillThreshold ? '#FEE2E2' : '#DCFCE7',
-                                color: med.currentStock <= med.refillThreshold ? '#B91C1C' : '#15803D'
-                              }}
-                            >
-                              Stock: {med.currentStock}
-                            </span>
-                          )}
-                          {med.currentStock === 0 && med.refillThreshold > 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
-                              Out of Stock
-                            </span>
-                          )}
-                        </div>
-                        <p style={{ fontSize: '12px', color: '#475569' }}>
-                          {med.dosage} {med.unit} • {med.scheduledTime}
-                        </p>
-                      </div>
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="w-12 h-12 rounded-lg flex flex-shrink-0 items-center justify-center"
+                      style={{ backgroundColor: med.isTaken ? '#4D7C6F' : med.isMissed ? '#EF4444' : 'white' }}
+                    >
+                      {med.isTaken ? (
+                        <CheckCircle2 className="w-6 h-6" style={{ color: 'white' }} />
+                      ) : med.isMissed ? (
+                        <XCircle className="w-6 h-6" style={{ color: 'white' }} />
+                      ) : (
+                        <Pill className="w-6 h-6" style={{ color: '#0F766E' }} />
+                      )}
                     </div>
-
-                    {!med.isTaken && !med.isMissed ? (
-                      <div className="flex flex-col gap-2 w-full sm:w-auto">
-                        <input
-                          type="text"
-                          placeholder="Add note (optional)..."
-                          className="px-3 py-1.5 text-xs rounded-lg border focus:ring-1 focus:ring-teal-500 outline-none"
-                          style={{ backgroundColor: 'white', borderColor: '#E6EAF0' }}
-                          value={doseNotes[`${med.id}-${med.scheduledTime}`] || ''}
-                          onChange={(e) => handleNoteChange(med.id, med.scheduledTime, e.target.value)}
-                        />
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => onMarkTaken(med.id, med.scheduledTime, doseNotes[`${med.id}-${med.scheduledTime}`])}
-                            className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium"
-                            style={{ backgroundColor: '#0F766E', color: 'white' }}
-                          >
-                            Taken
-                          </button>
-                          <button
-                            onClick={() => onMarkMissed(med.id, med.scheduledTime, doseNotes[`${med.id}-${med.scheduledTime}`])}
-                            className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium border"
-                            style={{ borderColor: '#FCA5A5', color: '#EF4444', backgroundColor: 'white' }}
-                          >
-                            Missed
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="flex items-center gap-3">
-                          <div style={{ color: med.isTaken ? '#4D7C6F' : '#EF4444', fontSize: '14px', fontWeight: 600 }}>
-                            {med.isTaken ? '✓ Completed' : '✕ Missed'}
-                          </div>
-                          <button
-                            onClick={() => onDeleteDose(med.id, med.scheduledTime)}
-                            className="text-xs px-2 py-1 rounded bg-white hover:bg-gray-100 border text-gray-500 font-medium"
-                            style={{ borderColor: '#E6EAF0' }}
-                          >
-                            Undo
-                          </button>
-                        </div>
-                        {med.historyItem?.notes && (
-                          <p className="text-[11px] text-gray-500 italic mt-1">
-                            Note: {med.historyItem.notes}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                    <div>
+                      <h3 className="mb-1">{med.name}</h3>
+                      <p style={{ fontSize: '12px', color: '#475569' }}>
+                        {med.dosage} {med.unit} • {med.scheduledTime}
+                      </p>
+                    </div>
                   </div>
+                  {!med.isTaken && !med.isMissed ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onMarkTaken(med.id, med.scheduledTime)}
+                        className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium"
+                        style={{ backgroundColor: '#0F766E', color: 'white' }}
+                      >
+                        Taken
+                      </button>
+                      <button
+                        onClick={() => onMarkMissed(med.id, med.scheduledTime)}
+                        className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium border"
+                        style={{ borderColor: '#FCA5A5', color: '#EF4444', backgroundColor: 'white' }}
+                      >
+                        Missed
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between sm:justify-end gap-3 px-1">
+                      <div style={{ color: med.isTaken ? '#4D7C6F' : '#EF4444', fontSize: '14px', fontWeight: 600 }}>
+                        {med.isTaken ? '✓ Completed' : '✕ Missed'}
+                      </div>
+                      <button
+                        onClick={() => onDeleteDose(med.id, med.scheduledTime)}
+                        className="text-xs px-2 py-1 rounded bg-white hover:bg-gray-100 border text-gray-500 font-medium"
+                        style={{ borderColor: '#E6EAF0' }}
+                      >
+                        Undo
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

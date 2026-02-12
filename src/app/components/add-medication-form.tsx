@@ -28,8 +28,6 @@ export interface MedicationFormData {
   instructions?: string;
   condition?: string;
   prescribedBy?: string;
-  initialStock: number;
-  refillThreshold: number;
 }
 
 export function AddMedicationForm({ onClose, onSave }: AddMedicationFormProps) {
@@ -42,9 +40,7 @@ export function AddMedicationForm({ onClose, onSave }: AddMedicationFormProps) {
     isOngoing: false,
     instructions: '',
     condition: '',
-    prescribedBy: '',
-    initialStock: 0,
-    refillThreshold: 5
+    prescribedBy: ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -261,40 +257,6 @@ export function AddMedicationForm({ onClose, onSave }: AddMedicationFormProps) {
                 style={{ backgroundColor: 'white' }}
               />
             </div>
-          </div>
-
-          {/* Inventory Tracking */}
-          <div className="pt-4 border-t" style={{ borderColor: '#E6EAF0' }}>
-            <h3 className="mb-4" style={{ fontSize: '16px', fontWeight: 600 }}>Inventory Tracking</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="initialStock">Current Stock Quantity</Label>
-                <Input
-                  id="initialStock"
-                  type="number"
-                  value={formData.initialStock || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, initialStock: parseInt(e.target.value) }))}
-                  placeholder="e.g., 30"
-                  className="mt-2 h-11"
-                  style={{ backgroundColor: 'white' }}
-                />
-              </div>
-              <div>
-                <Label htmlFor="refillThreshold">Refill Alert Limit</Label>
-                <Input
-                  id="refillThreshold"
-                  type="number"
-                  value={formData.refillThreshold || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, refillThreshold: parseInt(e.target.value) }))}
-                  placeholder="e.g., 5"
-                  className="mt-2 h-11"
-                  style={{ backgroundColor: 'white' }}
-                />
-              </div>
-            </div>
-            <p className="mt-2" style={{ fontSize: '12px', color: '#64748b' }}>
-              We'll notify you when your stock dips below the alert limit.
-            </p>
           </div>
 
           {/* Action Buttons */}
